@@ -1,0 +1,12 @@
+{
+  "buildCommand": "cd ../.. && pnpm --filter @roomx/web build",
+  "outputDirectory": "apps/web/dist",
+  "installCommand": "cd ../.. && pnpm install",
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/((?!api|_next|static|favicon.ico|robots.txt|manifest.json|sw.js).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

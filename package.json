@@ -1,0 +1,31 @@
+{
+  "name": "roomx",
+  "private": true,
+  "version": "1.0.0",
+  "description": "RoomX - Collaborative Virtual Room Platform",
+  "scripts": {
+    "dev": "concurrently \"pnpm --filter @roomx/server dev\" \"pnpm --filter @roomx/web dev\"",
+    "dev:web": "pnpm --filter @roomx/web dev",
+    "dev:server": "pnpm --filter @roomx/server dev",
+    "build": "pnpm --filter @roomx/shared build && pnpm --filter @roomx/server build && pnpm --filter @roomx/web build",
+    "build:web": "pnpm --filter @roomx/web build",
+    "build:server": "pnpm --filter @roomx/server build",
+    "build:shared": "pnpm --filter @roomx/shared build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:server": "pnpm --filter @roomx/server test",
+    "test:web": "pnpm --filter @roomx/web test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "clean": "pnpm -r exec rm -rf dist node_modules/.cache"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
