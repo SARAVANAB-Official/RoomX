@@ -17,3 +17,5 @@ coverage
 tmp
 temp
 supabase/.temp
+
+.vercel
