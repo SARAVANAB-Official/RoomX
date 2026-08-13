@@ -95,7 +95,6 @@ export default function CreateRoom() {
         method: 'POST',
         body: JSON.stringify({
           name: roomName,
-          description: displayName,
           maxParticipants,
           isPrivate: privacy !== RoomPrivacy.PUBLIC,
         }),

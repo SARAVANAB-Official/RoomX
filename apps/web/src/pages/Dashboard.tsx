@@ -69,8 +69,8 @@ export default function Dashboard() {
   const fetchRooms = async () => {
     setLoading(true);
     try {
-      const data = await makeApi<{ data: any[] }>('/api/rooms/mine');
-      setMyRooms((data.data || []).map((r: any) => ({
+      const rooms = await makeApi<any[]>('/api/rooms/mine');
+      setMyRooms((rooms || []).map((r: any) => ({
         id: r.id,
         name: r.name,
         code: r.room_code || r.code,

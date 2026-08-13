@@ -40,21 +40,35 @@ export async function makeApi<T = unknown>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  const url = `${API_URL.replace(/\/+$/, '')}${path}`;
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (err) {
+    throw new ApiError(
+      'Unable to connect to the server. Please check your connection.',
+      0,
+      null,
+    );
+  }
 
   const contentType = response.headers.get('content-type');
   const isJson = contentType?.includes('application/json');
   const body = isJson ? await response.json() : await response.text();
 
   if (!response.ok) {
-    throw new ApiError(
-      typeof body === 'string' ? body : body?.message ?? 'Request failed',
-      response.status,
-      body,
-    );
+    const errorMessage = typeof body === 'string'
+      ? body
+      : body?.error?.message ?? body?.message ?? `Request failed (${response.status})`;
+    throw new ApiError(errorMessage, response.status, body);
+  }
+
+  if (isJson && body && typeof body === 'object' && 'data' in body) {
+    return body.data as T;
   }
 
   return body as T;

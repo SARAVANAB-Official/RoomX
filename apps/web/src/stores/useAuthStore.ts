@@ -78,7 +78,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         method: 'POST',
         body: JSON.stringify({ displayName }),
       });
-      if (result.user && result.session) {
+      if (result?.user && result?.session) {
         set({
           user: mapSupabaseUser(result.user),
           session: result.session as any,
@@ -95,6 +95,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
       } else {
         set({ loading: false });
+        return { error: 'Invalid response from server' };
       }
       return {};
     } catch (err) {
