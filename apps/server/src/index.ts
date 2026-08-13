@@ -20,6 +20,8 @@ import moderationRoutes from "./routes/moderation.js";
 const app = express();
 const httpServer = createServer(app);
 
+app.set("trust proxy", 1);
+
 const io = new Server(httpServer, {
   cors: {
     origin: config.clientUrl,
