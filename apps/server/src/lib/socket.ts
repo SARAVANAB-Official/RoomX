@@ -83,7 +83,7 @@ function getUserSocketId(roomId: string, userId: string): string | null {
 
 export function setupSocketHandlers(io: Server): void {
   io.on("connection", async (socket: Socket) => {
-    const authPayload = authenticateSocket(
+    const authPayload = await authenticateSocket(
       socket.handshake.auth as Record<string, unknown>
     );
 
