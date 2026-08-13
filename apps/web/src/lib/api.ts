@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
@@ -16,7 +17,12 @@ export class ApiError extends Error {
 
 async function getAuthToken(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
-  return data.session?.access_token ?? null;
+  if (data.session?.access_token) return data.session.access_token;
+
+  const storeSession = useAuthStore.getState().session;
+  if (storeSession?.access_token) return storeSession.access_token;
+
+  return null;
 }
 
 export async function makeApi<T = unknown>(
