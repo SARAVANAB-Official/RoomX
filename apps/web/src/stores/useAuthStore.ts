@@ -79,7 +79,13 @@ export const useAuthStore = create<AuthState>((set) => ({
         body: JSON.stringify({ displayName }),
       });
       set({ loading: false });
-      if (result.user) set({ user: mapSupabaseUser(result.user), session: result.session as any });
+      if (result.user && result.session) {
+        set({ user: mapSupabaseUser(result.user), session: result.session as any });
+        await supabase.auth.setSession({
+          access_token: result.session.access_token,
+          refresh_token: result.session.refresh_token,
+        });
+      }
       return {};
     } catch (err) {
       set({ loading: false });
