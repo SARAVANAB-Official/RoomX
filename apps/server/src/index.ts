@@ -24,6 +24,7 @@ const httpServer = createServer(app);
 app.set("trust proxy", 1);
 
 const io = new Server(httpServer, {
+  path: "/socket.io",
   cors: {
     origin: config.clientUrl,
     methods: ["GET", "POST"],
@@ -31,10 +32,17 @@ const io = new Server(httpServer, {
   },
   pingTimeout: 60000,
   pingInterval: 25000,
-  transports: ["websocket", "polling"],
+  transports: ["polling", "websocket"],
+  allowUpgrades: true,
+  httpCompression: false,
 });
 
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: false,
+  })
+);
 app.use(cors({ origin: config.clientUrl, credentials: true }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
@@ -48,11 +56,15 @@ app.use(fileRoutes);
 app.use(pollRoutes);
 app.use(moderationRoutes);
 
+app.get("/api/socketio-health", (_req, res) => {
+  res.json({ success: true, data: { socketio: "ok", connections: io.engine.clientsCount } });
+});
+
 app.use(errorHandler);
 
 setupSocketHandlers(io);
 
-httpServer.listen(config.port, () => {
+httpServer.listen(config.port, "0.0.0.0", () => {
   console.log(
     `🚀 RoomX server running on port ${config.port} [${config.nodeEnv}]`
   );

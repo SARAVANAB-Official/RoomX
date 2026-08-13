@@ -31,12 +31,13 @@ export function useSocket(roomId?: string): UseSocketReturn {
     const session = useAuthStore.getState().session;
 
     const socket = io(SOCKET_URL, {
+      path: "/socket.io",
       autoConnect: false,
       reconnection: true,
       reconnectionAttempts: maxReconnectAttempts,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 30000,
-      timeout: 10000,
+      timeout: 20000,
       auth: {
         token: session?.access_token || '',
         displayName: currentUser?.displayName || 'Guest',
@@ -53,6 +54,10 @@ export function useSocket(roomId?: string): UseSocketReturn {
           roomId: currentRoomId,
           userId: currentUser.id,
           displayName: currentUser.displayName,
+        }, (response: any) => {
+          if (!response?.success) {
+            console.error('room:join failed:', response?.error);
+          }
         });
       }
     });
