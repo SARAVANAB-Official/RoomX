@@ -9,10 +9,22 @@ export const supabaseAdmin = createClient(
       autoRefreshToken: false,
       persistSession: false,
     },
+    realtime: {
+      params: {
+        eventsPerSecondLimit: 0,
+      },
+    },
   }
 );
 
 export const supabaseClient = createClient(
   config.supabaseUrl,
-  config.supabaseAnonKey
+  config.supabaseAnonKey,
+  {
+    realtime: {
+      params: {
+        eventsPerSecondLimit: 0,
+      },
+    },
+  }
 );
