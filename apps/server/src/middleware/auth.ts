@@ -1,5 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
 import { supabaseAdmin } from "../lib/supabase.js";
+import { config } from "../config/index.js";
 import { UnauthorizedError } from "../utils/errors.js";
 
 declare global {
@@ -9,6 +11,7 @@ declare global {
       authPayload?: {
         userId: string;
         email?: string;
+        isGuest?: boolean;
       };
     }
   }
@@ -22,6 +25,28 @@ function extractToken(req: Request): string | null {
   return null;
 }
 
+async function resolveUser(token: string): Promise<{ userId: string; email?: string; isGuest?: boolean } | null> {
+  try {
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+    if (!error && data.user) {
+      return { userId: data.user.id, email: data.user.email, isGuest: false };
+    }
+  } catch {
+    // not a Supabase token
+  }
+
+  try {
+    const payload = jwt.verify(token, config.jwtSecret) as any;
+    if (payload.userId) {
+      return { userId: payload.userId, email: payload.email, isGuest: payload.isGuest || false };
+    }
+  } catch {
+    // not a valid guest token either
+  }
+
+  return null;
+}
+
 export async function authenticate(
   req: Request,
   _res: Response,
@@ -32,20 +57,14 @@ export async function authenticate(
     return next(new UnauthorizedError("Missing authorization token"));
   }
 
-  try {
-    const { data, error } = await supabaseAdmin.auth.getUser(token);
-    if (error || !data.user) {
-      return next(new UnauthorizedError("Invalid or expired token"));
-    }
-    req.userId = data.user.id;
-    req.authPayload = {
-      userId: data.user.id,
-      email: data.user.email,
-    };
-    next();
-  } catch {
-    next(new UnauthorizedError("Invalid or expired token"));
+  const user = await resolveUser(token);
+  if (!user) {
+    return next(new UnauthorizedError("Invalid or expired token"));
   }
+
+  req.userId = user.userId;
+  req.authPayload = user;
+  next();
 }
 
 export async function authenticateOptional(
@@ -58,32 +77,19 @@ export async function authenticateOptional(
     return next();
   }
 
-  try {
-    const { data } = await supabaseAdmin.auth.getUser(token);
-    if (data.user) {
-      req.userId = data.user.id;
-      req.authPayload = {
-        userId: data.user.id,
-        email: data.user.email,
-      };
-    }
-  } catch {
-    // ignore invalid tokens for optional auth
+  const user = await resolveUser(token);
+  if (user) {
+    req.userId = user.userId;
+    req.authPayload = user;
   }
   next();
 }
 
 export async function authenticateSocket(
   handshakeAuth: Record<string, unknown>
-): Promise<{ userId: string; email?: string } | null> {
+): Promise<{ userId: string; email?: string; isGuest?: boolean } | null> {
   const token = handshakeAuth.token as string | undefined;
   if (!token) return null;
 
-  try {
-    const { data, error } = await supabaseAdmin.auth.getUser(token);
-    if (error || !data.user) return null;
-    return { userId: data.user.id, email: data.user.email };
-  } catch {
-    return null;
-  }
+  return await resolveUser(token);
 }

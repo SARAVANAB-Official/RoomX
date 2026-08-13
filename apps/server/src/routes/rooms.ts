@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
+import jwt from "jsonwebtoken";
+import { v4 as uuidv4 } from "uuid";
 import { supabaseAdmin } from "../lib/supabase.js";
+import { config } from "../config/index.js";
 import { authenticate, authenticateOptional } from "../middleware/auth.js";
 import { generateRoomId, generateRoomCode } from "../utils/ids.js";
 import {
@@ -14,6 +17,7 @@ const router = Router();
 
 const createRoomSchema = z.object({
   name: z.string().min(1).max(100),
+  displayName: z.string().min(1).max(50).optional(),
   maxParticipants: z.coerce.number().int().min(2).max(100).default(50),
   isPrivate: z.boolean().default(false),
 });
@@ -24,17 +28,37 @@ const updateSettingsSchema = z.object({
   isPrivate: z.boolean().optional(),
 });
 
-router.post("/api/rooms", authenticate, async (req, res, next) => {
+router.post("/api/rooms", authenticateOptional, async (req, res, next) => {
   try {
     const body = createRoomSchema.parse(req.body);
     const roomId = generateRoomId();
     const roomCode = generateRoomCode();
 
-    await supabaseAdmin.from("users").upsert({
-      id: req.userId,
-      display_name: req.authPayload?.email || "User",
-      is_guest: false,
-    }, { onConflict: "id" });
+    let userId = req.userId;
+    let guestToken: string | undefined;
+
+    if (!userId) {
+      const displayName = body.displayName || "Guest";
+      userId = uuidv4();
+
+      await supabaseAdmin.from("users").upsert({
+        id: userId,
+        display_name: displayName,
+        is_guest: true,
+      }, { onConflict: "id" });
+
+      guestToken = jwt.sign(
+        { userId, displayName, isGuest: true },
+        config.jwtSecret,
+        { expiresIn: "24h" }
+      );
+    } else {
+      await supabaseAdmin.from("users").upsert({
+        id: userId,
+        display_name: req.authPayload?.email || "User",
+        is_guest: req.authPayload?.isGuest || false,
+      }, { onConflict: "id" });
+    }
 
     const { data, error } = await supabaseAdmin
       .from("rooms")
@@ -44,7 +68,7 @@ router.post("/api/rooms", authenticate, async (req, res, next) => {
         name: body.name,
         privacy: body.isPrivate ? "private" : "public",
         max_participants: body.maxParticipants,
-        owner_id: req.userId,
+        owner_id: userId,
       })
       .select()
       .single();
@@ -53,11 +77,28 @@ router.post("/api/rooms", authenticate, async (req, res, next) => {
 
     await supabaseAdmin.from("room_members").insert({
       room_id: roomId,
-      user_id: req.userId,
+      user_id: userId,
       role: "owner",
     });
 
-    res.status(201).json({ success: true, data });
+    const response: Record<string, unknown> = {
+      success: true,
+      data: {
+        id: data.id,
+        roomCode: data.room_code,
+        name: data.name,
+        privacy: data.privacy,
+        maxParticipants: data.max_participants,
+        ownerId: data.owner_id,
+        createdAt: data.created_at,
+      },
+    };
+
+    if (guestToken) {
+      response.data = { ...response.data as object, guestToken };
+    }
+
+    res.status(201).json(response);
   } catch (err) {
     next(err);
   }
@@ -91,12 +132,12 @@ router.get("/api/rooms/:roomId", authenticateOptional, async (req, res, next) =>
 
     if (error || !data) throw new NotFoundError("Room not found");
 
-    if (data.is_private && data.owner_id !== req.userId) {
+    if (data.privacy === "private" && data.owner_id !== req.userId) {
       const { data: membership } = await supabaseAdmin
         .from("room_members")
         .select("id")
         .eq("room_id", roomId)
-        .eq("user_id", req.userId)
+        .eq("user_id", req.userId || "")
         .single();
 
       if (!membership) throw new ForbiddenError("Room is private");

@@ -1,0 +1,22 @@
+{
+  "name": "RoomX - Collaborative Virtual Rooms",
+  "short_name": "RoomX",
+  "description": "Real-time collaborative virtual room platform with video, chat, screen sharing, and more.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#030712",
+  "theme_color": "#6366f1",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

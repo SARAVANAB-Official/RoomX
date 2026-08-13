@@ -68,7 +68,7 @@ export default function CreateRoom() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, session } = useAuthStore();
 
   const toggleSetting = (key: keyof Settings) => {
     setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -78,7 +78,7 @@ export default function CreateRoom() {
     const newErrors: Record<string, string> = {};
     if (!roomName.trim()) newErrors.roomName = 'Room name is required';
     else if (roomName.length > 100) newErrors.roomName = 'Room name must be 100 characters or less';
-    if (!displayName.trim()) newErrors.displayName = 'Display name is required';
+    if (!user && !displayName.trim()) newErrors.displayName = 'Display name is required for guests';
     if (privacy === RoomPrivacy.PASSWORD && !password.trim()) newErrors.password = 'Password is required for private rooms';
     if (maxParticipants < 2 || maxParticipants > 100) newErrors.maxParticipants = 'Must be between 2 and 100';
     setErrors(newErrors);
@@ -91,15 +91,46 @@ export default function CreateRoom() {
 
     setLoading(true);
     try {
-      const room = await makeApi<{ id: string }>('/api/rooms', {
+      const payload: Record<string, unknown> = {
+        name: roomName,
+        maxParticipants,
+        isPrivate: privacy !== RoomPrivacy.PUBLIC,
+      };
+
+      if (!user) {
+        payload.displayName = displayName.trim() || 'Guest';
+      }
+
+      const result = await makeApi<{ id: string; guestToken?: string }>('/api/rooms', {
         method: 'POST',
-        body: JSON.stringify({
-          name: roomName,
-          maxParticipants,
-          isPrivate: privacy !== RoomPrivacy.PUBLIC,
-        }),
+        body: JSON.stringify(payload),
       });
-      navigate(`/room/${room.id}`);
+
+      if (result.guestToken) {
+        const { setUser, setSession } = useAuthStore.getState();
+        const guestUser = {
+          id: result.id,
+          displayName: displayName.trim() || 'Guest',
+          email: undefined,
+          avatarUrl: undefined,
+          role: 'OWNER' as any,
+          status: 'ONLINE' as any,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          lastSeenAt: new Date(),
+        };
+        const guestSession = {
+          access_token: result.guestToken,
+          refresh_token: '',
+          expires_in: 86400,
+          token_type: 'bearer',
+          user: guestUser,
+        };
+        setUser(guestUser);
+        setSession(guestSession as any);
+      }
+
+      navigate(`/room/${result.id}`);
     } catch (err) {
       setErrors({ general: err instanceof Error ? err.message : 'Failed to create room' });
     } finally {
@@ -142,23 +173,25 @@ export default function CreateRoom() {
                 {errors.roomName && <p className="mt-1 text-xs text-red-400">{errors.roomName}</p>}
               </div>
 
-              <div>
-                <label htmlFor="displayName" className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Your Display Name <span className="text-red-400">*</span>
-                </label>
-                <input
-                  id="displayName"
-                  type="text"
-                  required
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all ${
-                    errors.displayName ? 'border-red-500/50' : 'border-white/10'
-                  }`}
-                  placeholder={user?.displayName || 'Your name'}
-                />
-                {errors.displayName && <p className="mt-1 text-xs text-red-400">{errors.displayName}</p>}
-              </div>
+              {!user && (
+                <div>
+                  <label htmlFor="displayName" className="block text-sm font-medium text-gray-300 mb-1.5">
+                    Your Display Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    id="displayName"
+                    type="text"
+                    required
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all ${
+                      errors.displayName ? 'border-red-500/50' : 'border-white/10'
+                    }`}
+                    placeholder="Your name"
+                  />
+                  {errors.displayName && <p className="mt-1 text-xs text-red-400">{errors.displayName}</p>}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-3">
