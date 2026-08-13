@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { UserRole, UserStatus } from '@roomx/shared';
 import type { User } from '@roomx/shared';
 import { supabase } from '@/lib/supabase';
+import { makeApi } from '@/lib/api';
 
 interface Session {
   access_token: string;
@@ -72,27 +73,18 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   signInAsGuest: async (displayName) => {
     set({ loading: true });
-    const { data, error } = await supabase.auth.signInAnonymously({
-      options: { data: { display_name: displayName, is_guest: true } },
-    });
-    set({ loading: false });
-    if (error) {
-      // Fallback: create account with temp email if anonymous auth not enabled
-      const tempEmail = `${displayName.toLowerCase().replace(/\s/g, '')}-${Date.now()}@guest.roomx.local`;
-      const tempPassword = `Guest-${Date.now()}-${Math.random().toString(36).slice(2)}!`;
-      set({ loading: true });
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: tempEmail,
-        password: tempPassword,
-        options: { data: { display_name: displayName, is_guest: true } },
+    try {
+      const result = await makeApi<{ user: any; session: any }>('/api/auth/guest', {
+        method: 'POST',
+        body: JSON.stringify({ displayName }),
       });
       set({ loading: false });
-      if (signUpError) return { error: signUpError.message };
-      if (signUpData.user) set({ user: mapSupabaseUser(signUpData.user), session: signUpData.session as any });
+      if (result.user) set({ user: mapSupabaseUser(result.user), session: result.session as any });
       return {};
+    } catch (err) {
+      set({ loading: false });
+      return { error: err instanceof Error ? err.message : 'Guest login failed' };
     }
-    if (data.user) set({ user: mapSupabaseUser(data.user), session: data.session as any });
-    return {};
   },
 
   signOut: async () => {

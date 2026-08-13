@@ -11,6 +11,7 @@ import { apiLimiter } from "./middleware/rateLimiter.js";
 import { errorHandler } from "./utils/errors.js";
 
 import healthRoutes from "./routes/health.js";
+import authRoutes from "./routes/auth.js";
 import roomRoutes from "./routes/rooms.js";
 import messageRoutes from "./routes/messages.js";
 import fileRoutes from "./routes/files.js";
@@ -40,6 +41,7 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use("/api", apiLimiter);
 
 app.use(healthRoutes);
+app.use(authRoutes);
 app.use(roomRoutes);
 app.use(messageRoutes);
 app.use(fileRoutes);
