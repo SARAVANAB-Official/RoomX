@@ -72,15 +72,25 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   signInAsGuest: async (displayName) => {
     set({ loading: true });
-    const tempEmail = `${displayName.toLowerCase().replace(/\s/g, '')}-${Date.now()}@guest.roomx.local`;
-    const tempPassword = `guest-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const { data, error } = await supabase.auth.signUp({
-      email: tempEmail,
-      password: tempPassword,
+    const { data, error } = await supabase.auth.signInAnonymously({
       options: { data: { display_name: displayName, is_guest: true } },
     });
     set({ loading: false });
-    if (error) return { error: error.message };
+    if (error) {
+      // Fallback: create account with temp email if anonymous auth not enabled
+      const tempEmail = `${displayName.toLowerCase().replace(/\s/g, '')}-${Date.now()}@guest.roomx.local`;
+      const tempPassword = `Guest-${Date.now()}-${Math.random().toString(36).slice(2)}!`;
+      set({ loading: true });
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: tempEmail,
+        password: tempPassword,
+        options: { data: { display_name: displayName, is_guest: true } },
+      });
+      set({ loading: false });
+      if (signUpError) return { error: signUpError.message };
+      if (signUpData.user) set({ user: mapSupabaseUser(signUpData.user), session: signUpData.session as any });
+      return {};
+    }
     if (data.user) set({ user: mapSupabaseUser(data.user), session: data.session as any });
     return {};
   },
