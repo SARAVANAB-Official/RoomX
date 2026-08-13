@@ -9,6 +9,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/store';
+import { makeApi } from '@/lib/api';
 import Avatar from '@/components/ui/Avatar';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -68,46 +69,19 @@ export default function Dashboard() {
   const fetchRooms = async () => {
     setLoading(true);
     try {
-      // Simulated API call - replace with actual API
-      await new Promise((r) => setTimeout(r, 800));
-      setMyRooms([
-        {
-          id: '1',
-          name: 'Design Sprint',
-          code: 'DSP-2847',
-          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          isActive: true,
-          participantCount: 5,
-        },
-        {
-          id: '2',
-          name: 'Team Standup',
-          code: 'TST-1935',
-          createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          isActive: false,
-          participantCount: 0,
-        },
-        {
-          id: '3',
-          name: 'Code Review',
-          code: 'CRV-7621',
-          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          isActive: true,
-          participantCount: 3,
-        },
-      ]);
-      setRecentRooms([
-        {
-          id: '4',
-          name: 'Client Demo',
-          code: 'CDM-4821',
-          createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-          isActive: true,
-          participantCount: 8,
-        },
-      ]);
+      const data = await makeApi<{ data: any[] }>('/api/rooms/mine');
+      setMyRooms((data.data || []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        code: r.code,
+        createdAt: r.created_at || r.createdAt,
+        isActive: true,
+        participantCount: r.participant_count || 0,
+      })));
+      setRecentRooms([]);
     } catch {
-      addToast({ type: 'error', message: 'Failed to load rooms' });
+      setMyRooms([]);
+      setRecentRooms([]);
     } finally {
       setLoading(false);
     }

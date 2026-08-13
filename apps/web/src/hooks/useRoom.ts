@@ -109,7 +109,7 @@ export function useRoom() {
     if (!currentRoom) return false;
     try {
       await makeApi(`/api/rooms/${currentRoom.id}/settings`, {
-        method: 'PUT',
+        method: 'PATCH',
         body: JSON.stringify(settings),
       });
       return true;

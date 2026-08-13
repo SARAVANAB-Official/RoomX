@@ -27,6 +27,9 @@ export function useSocket(roomId?: string): UseSocketReturn {
   const connect = useCallback(() => {
     if (socketRef.current?.connected) return;
 
+    const currentUser = useAuthStore.getState().user;
+    const session = useAuthStore.getState().session;
+
     const socket = io(SOCKET_URL, {
       autoConnect: false,
       reconnection: true,
@@ -34,6 +37,10 @@ export function useSocket(roomId?: string): UseSocketReturn {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 30000,
       timeout: 10000,
+      auth: {
+        token: session?.access_token || '',
+        displayName: currentUser?.displayName || 'Guest',
+      },
     });
 
     socket.on('connect', () => {

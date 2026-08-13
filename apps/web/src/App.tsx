@@ -11,6 +11,7 @@ const CreateRoom = lazy(() => import('@/pages/CreateRoom'));
 const JoinRoom = lazy(() => import('@/pages/JoinRoom'));
 const Login = lazy(() => import('@/pages/auth/Login'));
 const Register = lazy(() => import('@/pages/auth/Register'));
+const Room = lazy(() => import('@/pages/Room'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
 function LoadingFallback() {
@@ -44,6 +45,7 @@ export default function App() {
             <Route path="/join/:roomId" element={<JoinRoom />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/room/:roomId" element={<Room />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>

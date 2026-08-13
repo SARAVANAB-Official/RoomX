@@ -301,4 +301,20 @@ router.post("/api/rooms/:roomId/unlock", authenticate, async (req, res, next) =>
   }
 });
 
+router.get("/api/rooms/mine", authenticate, async (req, res, next) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("room_members")
+      .select("rooms(*)")
+      .eq("user_id", req.userId);
+
+    if (error) throw error;
+
+    const rooms = (data || []).map((m: any) => m.rooms).filter(Boolean);
+    res.json({ success: true, data: rooms });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

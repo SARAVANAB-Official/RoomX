@@ -95,10 +95,9 @@ export default function CreateRoom() {
         method: 'POST',
         body: JSON.stringify({
           name: roomName,
-          displayName,
-          password: privacy === RoomPrivacy.PASSWORD ? password : undefined,
-          privacy,
-          settings: { ...settings, maxParticipants, isLocked: false },
+          description: displayName,
+          maxParticipants,
+          isPrivate: privacy !== RoomPrivacy.PUBLIC,
         }),
       });
       navigate(`/room/${room.id}`);
