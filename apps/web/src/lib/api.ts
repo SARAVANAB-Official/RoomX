@@ -16,11 +16,19 @@ export class ApiError extends Error {
 }
 
 async function getAuthToken(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
-  if (data.session?.access_token) return data.session.access_token;
+  try {
+    const storeSession = useAuthStore.getState().session;
+    if (storeSession?.access_token) return storeSession.access_token;
+  } catch {
+    // store not ready
+  }
 
-  const storeSession = useAuthStore.getState().session;
-  if (storeSession?.access_token) return storeSession.access_token;
+  try {
+    const { data } = await supabase.auth.getSession();
+    if (data.session?.access_token) return data.session.access_token;
+  } catch {
+    // supabase not available
+  }
 
   return null;
 }

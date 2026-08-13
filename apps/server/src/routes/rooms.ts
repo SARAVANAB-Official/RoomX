@@ -81,22 +81,22 @@ router.post("/api/rooms", authenticateOptional, async (req, res, next) => {
       role: "owner",
     });
 
-    const response: Record<string, unknown> = {
-      success: true,
-      data: {
-        id: data.id,
-        roomCode: data.room_code,
-        name: data.name,
-        privacy: data.privacy,
-        maxParticipants: data.max_participants,
-        ownerId: data.owner_id,
-        createdAt: data.created_at,
-      },
+    const responseData: Record<string, unknown> = {
+      id: data.id,
+      roomCode: data.room_code,
+      name: data.name,
+      privacy: data.privacy,
+      maxParticipants: data.max_participants,
+      ownerId: data.owner_id,
+      createdAt: data.created_at,
     };
 
     if (guestToken) {
-      response.data = { ...response.data as object, guestToken };
+      responseData.userId = userId;
+      responseData.guestToken = guestToken;
     }
+
+    const response = { success: true, data: responseData };
 
     res.status(201).json(response);
   } catch (err) {
@@ -124,15 +124,15 @@ router.get("/api/rooms/:roomId", authenticateOptional, async (req, res, next) =>
   try {
     const { roomId } = req.params;
 
-    const { data, error } = await supabaseAdmin
+    const { data: room, error } = await supabaseAdmin
       .from("rooms")
       .select("*")
       .eq("id", roomId)
       .single();
 
-    if (error || !data) throw new NotFoundError("Room not found");
+    if (error || !room) throw new NotFoundError("Room not found");
 
-    if (data.privacy === "private" && data.owner_id !== req.userId) {
+    if (room.privacy === "private" && room.owner_id !== req.userId) {
       const { data: membership } = await supabaseAdmin
         .from("room_members")
         .select("id")
@@ -143,7 +143,53 @@ router.get("/api/rooms/:roomId", authenticateOptional, async (req, res, next) =>
       if (!membership) throw new ForbiddenError("Room is private");
     }
 
-    res.json({ success: true, data });
+    const { data: members } = await supabaseAdmin
+      .from("room_members")
+      .select("id, room_id, user_id, role, is_muted, is_camera_on, is_screen_sharing, is_hand_raised, joined_at, left_at")
+      .eq("room_id", roomId);
+
+    const shaped = {
+      id: room.id,
+      name: room.name,
+      description: room.description || null,
+      privacy: room.privacy?.toUpperCase() || "PUBLIC",
+      settings: {
+        password: room.password || null,
+        maxParticipants: room.max_participants || 50,
+        allowScreenShare: room.allow_screen_share !== false,
+        allowFileShare: room.allow_file_share !== false,
+        allowChat: room.allow_chat !== false,
+        allowCamera: room.allow_camera !== false,
+        allowMicrophone: room.allow_microphone !== false,
+        allowBrowserSync: room.allow_browser_sync !== false,
+        allowGuests: room.allow_guests !== false,
+        waitingRoom: room.waiting_room || false,
+        multiplePresenters: room.multiple_presenters !== false,
+        isLocked: room.is_locked || false,
+      },
+      ownerId: room.owner_id,
+      owner: null,
+      members: (members || []).map((m: any) => ({
+        id: m.id,
+        roomId: m.room_id,
+        userId: m.user_id,
+        user: null,
+        role: m.role,
+        isMuted: m.is_muted || false,
+        isCameraOn: m.is_camera_on || false,
+        isScreenSharing: m.is_screen_sharing || false,
+        isHandRaised: m.is_hand_raised || false,
+        joinedAt: m.joined_at,
+        leftAt: m.left_at,
+      })),
+      memberCount: (members || []).length,
+      isActive: (members || []).length > 0,
+      createdAt: room.created_at,
+      updatedAt: room.updated_at || room.created_at,
+      lastActiveAt: room.last_active_at || room.updated_at || room.created_at,
+    };
+
+    res.json({ success: true, data: shaped });
   } catch (err) {
     next(err);
   }

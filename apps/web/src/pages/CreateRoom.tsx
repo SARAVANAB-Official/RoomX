@@ -101,15 +101,16 @@ export default function CreateRoom() {
         payload.displayName = displayName.trim() || 'Guest';
       }
 
-      const result = await makeApi<{ id: string; guestToken?: string }>('/api/rooms', {
+      const result = await makeApi<{ id: string; userId?: string; guestToken?: string }>('/api/rooms', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
 
       if (result.guestToken) {
         const { setUser, setSession } = useAuthStore.getState();
+        const guestUserId = result.userId || result.id;
         const guestUser = {
-          id: result.id,
+          id: guestUserId,
           displayName: displayName.trim() || 'Guest',
           email: undefined,
           avatarUrl: undefined,

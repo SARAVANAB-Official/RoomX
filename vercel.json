@@ -1,8 +1,8 @@
 {
-  "buildCommand": "pnpm install && pnpm --filter @roomx/shared build && pnpm --filter @roomx/web build",
+  "installCommand": "npm install -g pnpm && pnpm install",
+  "buildCommand": "pnpm --filter @roomx/shared build && pnpm --filter @roomx/web build",
   "outputDirectory": "apps/web/dist",
-  "installCommand": "echo done",
-  "framework": "vite",
+  "framework": null,
   "rewrites": [
     {
       "source": "/((?!api|_next|static|favicon.ico|robots.txt|manifest.json|sw.js).*)",
