@@ -145,7 +145,7 @@ router.get("/api/rooms/:roomId", authenticateOptional, async (req, res, next) =>
 
     const { data: members } = await supabaseAdmin
       .from("room_members")
-      .select("id, room_id, user_id, role, is_muted, is_camera_on, is_screen_sharing, is_hand_raised, joined_at, left_at")
+      .select("id, room_id, user_id, role, is_muted, is_banned, joined_at")
       .eq("room_id", roomId);
 
     const shaped = {
@@ -176,11 +176,11 @@ router.get("/api/rooms/:roomId", authenticateOptional, async (req, res, next) =>
         user: null,
         role: m.role,
         isMuted: m.is_muted || false,
-        isCameraOn: m.is_camera_on || false,
-        isScreenSharing: m.is_screen_sharing || false,
-        isHandRaised: m.is_hand_raised || false,
+        isCameraOn: false,
+        isScreenSharing: false,
+        isHandRaised: false,
         joinedAt: m.joined_at,
-        leftAt: m.left_at,
+        leftAt: null,
       })),
       memberCount: (members || []).length,
       isActive: (members || []).length > 0,
