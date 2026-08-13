@@ -73,7 +73,7 @@ export default function Dashboard() {
       setMyRooms((data.data || []).map((r: any) => ({
         id: r.id,
         name: r.name,
-        code: r.code,
+        code: r.room_code || r.code,
         createdAt: r.created_at || r.createdAt,
         isActive: true,
         participantCount: r.participant_count || 0,

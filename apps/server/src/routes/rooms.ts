@@ -14,14 +14,12 @@ const router = Router();
 
 const createRoomSchema = z.object({
   name: z.string().min(1).max(100),
-  description: z.string().max(500).optional(),
   maxParticipants: z.coerce.number().int().min(2).max(100).default(50),
   isPrivate: z.boolean().default(false),
 });
 
 const updateSettingsSchema = z.object({
   name: z.string().min(1).max(100).optional(),
-  description: z.string().max(500).optional(),
   maxParticipants: z.coerce.number().int().min(2).max(100).optional(),
   isPrivate: z.boolean().optional(),
 });
@@ -36,11 +34,10 @@ router.post("/api/rooms", authenticate, async (req, res, next) => {
       .from("rooms")
       .insert({
         id: roomId,
-        code: roomCode,
+        room_code: roomCode,
         name: body.name,
-        description: body.description || null,
+        privacy: body.isPrivate ? "private" : "public",
         max_participants: body.maxParticipants,
-        is_private: body.isPrivate,
         owner_id: req.userId,
       })
       .select()
@@ -241,9 +238,8 @@ router.patch(
 
       const updates: Record<string, unknown> = {};
       if (body.name !== undefined) updates.name = body.name;
-      if (body.description !== undefined) updates.description = body.description;
       if (body.maxParticipants !== undefined) updates.max_participants = body.maxParticipants;
-      if (body.isPrivate !== undefined) updates.is_private = body.isPrivate;
+      if (body.isPrivate !== undefined) updates.privacy = body.isPrivate ? "private" : "public";
 
       const { data, error } = await supabaseAdmin
         .from("rooms")
