@@ -1,0 +1,12 @@
+node_modules
+.git
+.vercel
+*.md
+.env*
+!.env.example
+apps/web
+database
+docs
+.github
+.vscode
+.DS_Store
