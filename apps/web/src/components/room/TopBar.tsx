@@ -9,6 +9,7 @@ import {
 interface TopBarProps {
   roomName: string;
   connected: boolean;
+  connectError?: string | null;
   participantCount: number;
   onInvite: () => void;
   onSettings: () => void;
@@ -20,6 +21,7 @@ interface TopBarProps {
 export function TopBar({
   roomName,
   connected,
+  connectError,
   participantCount,
   onInvite,
   onSettings,
@@ -29,8 +31,14 @@ export function TopBar({
 }: TopBarProps) {
   const statusColor = connected
     ? 'text-green-400'
-    : 'text-yellow-400';
-  const statusLabel = connected ? 'Connected' : 'Connecting...';
+    : connectError
+      ? 'text-red-400'
+      : 'text-yellow-400';
+  const statusLabel = connected
+    ? 'Connected'
+    : connectError
+      ? `Error: ${connectError}`
+      : 'Connecting...';
 
   return (
     <div className="h-14 shrink-0 flex items-center justify-between px-4 bg-white/5 backdrop-blur-xl border-b border-white/10">

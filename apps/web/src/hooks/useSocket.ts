@@ -12,6 +12,7 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 interface UseSocketReturn {
   socket: Socket | null;
   connected: boolean;
+  connectError: string | null;
   connect: () => void;
   disconnect: () => void;
 }
@@ -19,25 +20,31 @@ interface UseSocketReturn {
 export function useSocket(roomId?: string): UseSocketReturn {
   const socketRef = useRef<Socket | null>(null);
   const [connected, setConnected] = useState(false);
-  const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 10;
+  const [connectError, setConnectError] = useState<string | null>(null);
 
   const user = useAuthStore((s) => s.user);
 
   const connect = useCallback(() => {
     if (socketRef.current?.connected) return;
+    if (socketRef.current) {
+      socketRef.current.removeAllListeners();
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
 
     const currentUser = useAuthStore.getState().user;
     const session = useAuthStore.getState().session;
+
+    console.log('[Socket] connecting to', SOCKET_URL, 'token present:', !!session?.access_token, 'user:', currentUser?.displayName);
 
     const socket = io(SOCKET_URL, {
       path: "/socket.io",
       autoConnect: false,
       reconnection: true,
-      reconnectionAttempts: maxReconnectAttempts,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 30000,
-      timeout: 20000,
+      reconnectionDelayMax: 10000,
+      timeout: 15000,
       auth: {
         token: session?.access_token || '',
         displayName: currentUser?.displayName || 'Guest',
@@ -45,8 +52,9 @@ export function useSocket(roomId?: string): UseSocketReturn {
     });
 
     socket.on('connect', () => {
+      console.log('[Socket] connected, id:', socket.id);
       setConnected(true);
-      reconnectAttempts.current = 0;
+      setConnectError(null);
       const currentUser = useAuthStore.getState().user;
       const currentRoomId = useRoomStore.getState().currentRoom?.id || roomId;
       if (currentRoomId && currentUser) {
@@ -55,35 +63,43 @@ export function useSocket(roomId?: string): UseSocketReturn {
           userId: currentUser.id,
           displayName: currentUser.displayName,
         }, (response: any) => {
-          if (!response?.success) {
-            console.error('room:join failed:', response?.error);
+          if (response?.success) {
+            console.log('[Socket] room:join success, members:', response.data?.members?.length);
+          } else {
+            console.error('[Socket] room:join failed:', response?.error);
+            setConnectError(response?.error || 'Failed to join room');
           }
         });
+      } else {
+        console.warn('[Socket] connect but no roomId or user', { currentRoomId, hasUser: !!currentUser });
       }
     });
 
     socket.on('disconnect', (reason) => {
+      console.log('[Socket] disconnected, reason:', reason);
       setConnected(false);
       if (reason === 'io server disconnect') {
         socket.connect();
       }
     });
 
-    socket.on('connect_error', () => {
-      reconnectAttempts.current++;
-      const delay = Math.min(1000 * 2 ** reconnectAttempts.current, 30000);
-      setTimeout(() => socket.connect(), delay);
+    socket.on('connect_error', (err) => {
+      console.error('[Socket] connect_error:', err.message);
+      setConnectError(err.message);
     });
 
     socket.on('room:state', (room) => {
+      console.log('[Socket] room:state received');
       useRoomStore.getState().setCurrentRoom(room);
     });
 
     socket.on('room:member-joined', ({ member }) => {
+      console.log('[Socket] member-joined:', member?.userId);
       useRoomStore.getState().addMember(member);
     });
 
     socket.on('room:member-left', ({ userId }) => {
+      console.log('[Socket] member-left:', userId);
       useRoomStore.getState().removeMember(userId);
       useMediaStore.getState().removeRemoteStream(userId);
     });
@@ -195,8 +211,11 @@ export function useSocket(roomId?: string): UseSocketReturn {
   }, [roomId]);
 
   const disconnect = useCallback(() => {
-    socketRef.current?.disconnect();
-    socketRef.current = null;
+    if (socketRef.current) {
+      socketRef.current.removeAllListeners();
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
     setConnected(false);
   }, []);
 
@@ -207,5 +226,5 @@ export function useSocket(roomId?: string): UseSocketReturn {
     };
   }, [connect, disconnect]);
 
-  return { socket: socketRef.current, connected, connect, disconnect };
+  return { socket: socketRef.current, connected, connectError, connect, disconnect };
 }

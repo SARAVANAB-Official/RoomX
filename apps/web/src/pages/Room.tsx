@@ -33,7 +33,7 @@ export default function Room() {
   const [showParticipants, setShowParticipants] = useState(false);
 
   const { fetchRoom, leaveRoom, isOwner } = useRoom();
-  const { socket, connected } = useSocket(roomId);
+  const { socket, connected, connectError } = useSocket(roomId);
   const { getLocalMedia, startScreenShare, stopScreenShare, cleanup: cleanupWebRTC } = useWebRTC();
 
   useEffect(() => {
@@ -175,6 +175,7 @@ export default function Room() {
         <TopBar
           roomName={currentRoom?.name || 'Room'}
           connected={connected}
+          connectError={connectError}
           participantCount={members.length}
           onInvite={() => setShowInvite(true)}
           onSettings={() => setShowSettings(true)}

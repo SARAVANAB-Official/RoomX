@@ -157,16 +157,33 @@ export function setupSocketHandlers(io: Server): void {
             socketId: sid,
             userId: connectedSockets.get(sid)?.userId,
             displayName: connectedSockets.get(sid)?.displayName,
-          }))
-          .filter((m) => m.socketId !== socket.id);
+          }));
 
-        socket.to(roomId).emit("user:joined", {
-          userId,
-          socketId: socket.id,
-          displayName,
+        const selfIndex = members.findIndex((m) => m.socketId === socket.id);
+        const others = selfIndex >= 0 ? members.filter((_, i) => i !== selfIndex) : members;
+
+        others.forEach((m) => {
+          io.to(m.socketId!).emit("room:member-joined", {
+            member: {
+              socketId: socket.id,
+              userId,
+              displayName,
+              user: { id: userId, displayName },
+            },
+          });
         });
 
-        callback?.({ success: true, data: { members, roomId } });
+        socket.emit("room:state", {
+          roomId,
+          members: members.map((m) => ({
+            socketId: m.socketId,
+            userId: m.userId,
+            displayName: m.displayName,
+            user: m.userId ? { id: m.userId, displayName: m.displayName } : null,
+          })),
+        });
+
+        callback?.({ success: true, data: { members: others, roomId } });
       } catch (err) {
         const message =
           err instanceof z.ZodError
