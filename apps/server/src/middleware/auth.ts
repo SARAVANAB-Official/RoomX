@@ -27,21 +27,21 @@ function extractToken(req: Request): string | null {
 
 async function resolveUser(token: string): Promise<{ userId: string; email?: string; isGuest?: boolean } | null> {
   try {
-    const { data, error } = await supabaseAdmin.auth.getUser(token);
-    if (!error && data.user) {
-      return { userId: data.user.id, email: data.user.email, isGuest: false };
-    }
-  } catch {
-    // not a Supabase token
-  }
-
-  try {
     const payload = jwt.verify(token, config.jwtSecret) as any;
     if (payload.userId) {
       return { userId: payload.userId, email: payload.email, isGuest: payload.isGuest || false };
     }
   } catch {
-    // not a valid guest token either
+    // not a backend-signed token
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+    if (!error && data.user) {
+      return { userId: data.user.id, email: data.user.email, isGuest: false };
+    }
+  } catch {
+    // not a Supabase token either
   }
 
   return null;
