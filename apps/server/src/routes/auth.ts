@@ -16,7 +16,7 @@ router.post("/api/auth/guest", async (req, res, next) => {
     const tempEmail = `guest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@roomx.guest`;
     const tempPassword = `Gx-${Date.now()}-${Math.random().toString(36).slice(2)}!A1`;
 
-    const { error: createError } = await supabaseAdmin.auth.admin.createUser({
+    const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email: tempEmail,
       password: tempPassword,
       email_confirm: true,
@@ -24,6 +24,13 @@ router.post("/api/auth/guest", async (req, res, next) => {
     });
 
     if (createError) throw createError;
+
+    await supabaseAdmin.from("users").upsert({
+      id: userData.user.id,
+      email: tempEmail,
+      display_name: displayName,
+      is_guest: true,
+    }, { onConflict: "id" });
 
     const anonClient = createClient(config.supabaseUrl, config.supabaseAnonKey);
     const { data: signInData, error: signInError } = await anonClient.auth.signInWithPassword({

@@ -30,6 +30,12 @@ router.post("/api/rooms", authenticate, async (req, res, next) => {
     const roomId = generateRoomId();
     const roomCode = generateRoomCode();
 
+    await supabaseAdmin.from("users").upsert({
+      id: req.userId,
+      display_name: req.authPayload?.email || "User",
+      is_guest: false,
+    }, { onConflict: "id" });
+
     const { data, error } = await supabaseAdmin
       .from("rooms")
       .insert({
