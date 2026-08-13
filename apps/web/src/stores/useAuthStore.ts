@@ -39,7 +39,7 @@ const mapSupabaseUser = (sbUser: any): User => ({
   lastSeenAt: new Date(),
 });
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   session: null,
   loading: false,
@@ -78,13 +78,23 @@ export const useAuthStore = create<AuthState>((set) => ({
         method: 'POST',
         body: JSON.stringify({ displayName }),
       });
-      set({ loading: false });
       if (result.user && result.session) {
-        set({ user: mapSupabaseUser(result.user), session: result.session as any });
-        await supabase.auth.setSession({
-          access_token: result.session.access_token,
-          refresh_token: result.session.refresh_token,
+        set({
+          user: mapSupabaseUser(result.user),
+          session: result.session as any,
+          loading: false,
+          initialized: true,
         });
+        try {
+          await supabase.auth.setSession({
+            access_token: result.session.access_token,
+            refresh_token: result.session.refresh_token,
+          });
+        } catch {
+          // setSession may fail — we still have the session in Zustand
+        }
+      } else {
+        set({ loading: false });
       }
       return {};
     } catch (err) {
@@ -99,6 +109,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   initialize: async () => {
+    const current = get();
+
+    if (current.user && current.session) {
+      set({ initialized: true });
+      return;
+    }
+
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       set({
@@ -111,9 +128,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
 
     supabase.auth.onAuthStateChange((_event, session) => {
+      const now = get();
       if (session) {
         set({ session: session as any, user: mapSupabaseUser(session.user) });
-      } else {
+      } else if (!now.user) {
         set({ user: null, session: null });
       }
     });
