@@ -15,6 +15,7 @@ import { VideoGrid } from '@/components/room/VideoGrid';
 import { InviteModal } from '@/components/room/InviteModal';
 import { SettingsPanel } from '@/components/room/SettingsPanel';
 import { ParticipantsList } from '@/components/room/ParticipantsList';
+import ChatPanel from '@/components/room/ChatPanel';
 
 type LoadingState = 'loading' | 'ready' | 'not-found' | 'unauthorized' | 'error';
 
@@ -31,6 +32,7 @@ export default function Room() {
   const [showInvite, setShowInvite] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showChat, setShowChat] = useState(false);
 
   const { fetchRoom, leaveRoom, isOwner } = useRoom();
   const { socket, connected, connectError } = useSocket(roomId);
@@ -91,6 +93,12 @@ export default function Room() {
       useMediaStore.getState().stopScreenShare();
     };
   }, [cleanupWebRTC, leaveRoom]);
+
+  useEffect(() => {
+    const handleToggleChat = () => setShowChat((prev) => !prev);
+    window.addEventListener('room:toggle-chat', handleToggleChat);
+    return () => window.removeEventListener('room:toggle-chat', handleToggleChat);
+  }, []);
 
   const handleLeave = useCallback(async () => {
     cleanupWebRTC();
@@ -216,6 +224,14 @@ export default function Room() {
               )}
             </div>
           </div>
+
+          {showChat && (
+            <div className="w-80 shrink-0 border-l border-white/10 animate-slide-in-right">
+              <div className="h-full p-2">
+                <ChatPanel socket={socket} />
+              </div>
+            </div>
+          )}
         </div>
 
         <BottomBar

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { X, Copy, Check, Share2, QrCode } from 'lucide-react';
 
 interface InviteModalProps {
@@ -11,6 +11,14 @@ export function InviteModal({ roomId, roomName, onClose }: InviteModalProps) {
   const [copied, setCopied] = useState(false);
 
   const roomUrl = `${window.location.origin}/join/${roomId}`;
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const handleCopy = useCallback(async () => {
     try {
