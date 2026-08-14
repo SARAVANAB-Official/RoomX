@@ -159,7 +159,7 @@ export function setupSocketHandlers(io: Server): void {
         const prevRoomId = connectedSockets.get(socket.id)?.roomId;
         if (prevRoomId) {
           socket.leave(prevRoomId);
-          io.to(prevRoomId).emit("user:left", {
+          io.to(prevRoomId).emit("room:member-left", {
             userId,
             socketId: socket.id,
             displayName,
@@ -222,7 +222,7 @@ export function setupSocketHandlers(io: Server): void {
         socket.leave(roomId);
         data.roomId = null;
 
-        io.to(roomId).emit("user:left", {
+        io.to(roomId).emit("room:member-left", {
           userId,
           socketId: socket.id,
           displayName,
@@ -1172,7 +1172,7 @@ export function setupSocketHandlers(io: Server): void {
     socket.on("disconnect", (reason) => {
       const data = connectedSockets.get(socket.id);
       if (data?.roomId) {
-        io.to(data.roomId).emit("user:left", {
+        io.to(data.roomId).emit("room:member-left", {
           userId,
           socketId: socket.id,
           displayName,
