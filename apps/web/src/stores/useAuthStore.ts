@@ -118,6 +118,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     const { data: { session } } = await supabase.auth.getSession();
+
+    const after = get();
+    if (after.user && after.session) {
+      set({ initialized: true });
+      return;
+    }
+
     if (session) {
       set({
         session: session as any,
@@ -129,11 +136,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     supabase.auth.onAuthStateChange((_event, session) => {
-      const now = get();
       if (session) {
         set({ session: session as any, user: mapSupabaseUser(session.user) });
-      } else if (!now.user) {
-        set({ user: null, session: null });
       }
     });
   },
