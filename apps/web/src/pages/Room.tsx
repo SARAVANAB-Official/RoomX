@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -37,6 +37,7 @@ export default function Room() {
   const { fetchRoom, leaveRoom, isOwner } = useRoom();
   const { socket, connected, connectError } = useSocket(roomId);
   const { getLocalMedia, startScreenShare, stopScreenShare, cleanup: cleanupWebRTC } = useWebRTC();
+  const hasLeftRef = useRef(false);
 
   useEffect(() => {
     if (!roomId) {
@@ -88,7 +89,9 @@ export default function Room() {
   useEffect(() => {
     return () => {
       cleanupWebRTC();
-      leaveRoom();
+      if (!hasLeftRef.current) {
+        leaveRoom();
+      }
       useMediaStore.getState().setLocalStream(null);
       useMediaStore.getState().stopScreenShare();
     };
@@ -101,6 +104,7 @@ export default function Room() {
   }, []);
 
   const handleLeave = useCallback(async () => {
+    hasLeftRef.current = true;
     cleanupWebRTC();
     await leaveRoom();
     navigate('/');
