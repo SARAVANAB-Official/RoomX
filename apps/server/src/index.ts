@@ -60,6 +60,27 @@ app.get("/api/socketio-health", (_req, res) => {
   res.json({ success: true, data: { socketio: "ok", connections: io.engine.clientsCount } });
 });
 
+app.get("/api/debug/socket-status", (_req, res) => {
+  const transports: string[] = [];
+  io.engine?.clientsCount && transports.push("polling");
+  res.json({
+    success: true,
+    data: {
+      service: "roomx-server",
+      status: "running",
+      uptime: Math.floor(process.uptime()),
+      socketio: {
+        initialized: true,
+        path: "/socket.io",
+        transports: ["polling", "websocket"],
+        activeConnections: io.engine.clientsCount,
+        corsOrigin: config.clientUrl,
+      },
+      version: "1.0.0",
+    },
+  });
+});
+
 app.use(errorHandler);
 
 setupSocketHandlers(io);

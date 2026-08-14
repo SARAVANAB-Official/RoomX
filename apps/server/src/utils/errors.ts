@@ -77,7 +77,7 @@ export function errorHandler(
     return;
   }
 
-  console.error("Unhandled error:", err);
+  console.error("Unhandled error:", err.message, err.stack?.split("\n").slice(0, 3).join(" | "));
   res.status(500).json({
     success: false,
     error: {

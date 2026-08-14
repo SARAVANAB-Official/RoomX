@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Lock, User, Loader2, Video, VideoOff, Mic, MicOff, AlertCircle } from 'lucide-react';
-import { makeApi } from '@/lib/api';
+import { makeApi, ApiError } from '@/lib/api';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 export default function JoinRoom() {
   const { roomId } = useParams<{ roomId: string }>();
@@ -44,9 +45,16 @@ export default function JoinRoom() {
           isBanned: false,
         });
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         setRoomInfo(null);
-        setError('Could not connect to server');
+        let msg = 'Could not connect to server';
+        if (err instanceof ApiError) {
+          const errBody = err.body as any;
+          msg = errBody?.error?.message || err.message || msg;
+        } else if (err instanceof Error) {
+          msg = err.message || msg;
+        }
+        setError(msg);
       })
       .finally(() => setFetchingRoom(false));
   }, [activeRoomId]);
@@ -105,13 +113,44 @@ export default function JoinRoom() {
     setError('');
 
     try {
-      await makeApi(`/api/rooms/${activeRoomId}/join`, {
-        method: 'POST',
-        body: JSON.stringify({ displayName, password }),
-      });
+      const result = await makeApi<{ message: string; userId?: string; guestToken?: string }>(
+        `/api/rooms/${activeRoomId}/join`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ displayName, password }),
+        },
+      );
+
+      if (result.guestToken && result.userId) {
+        const store = useAuthStore.getState();
+        store.setSession({
+          access_token: result.guestToken,
+          refresh_token: '',
+          expires_in: 86400,
+          token_type: 'bearer',
+          user: { id: result.userId },
+        } as any);
+        store.setUser({
+          id: result.userId,
+          displayName: displayName,
+          role: 'member' as any,
+          status: 'online' as any,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          lastSeenAt: new Date(),
+        } as any);
+      }
+
       navigate(`/room/${activeRoomId}`);
-    } catch {
-      setError('Could not connect to server');
+    } catch (err: unknown) {
+      let msg = 'Could not connect to server';
+      if (err instanceof ApiError) {
+        const errBody = err.body as any;
+        msg = errBody?.error?.error?.message || errBody?.error?.message || err.message || msg;
+      } else if (err instanceof Error) {
+        msg = err.message || msg;
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }

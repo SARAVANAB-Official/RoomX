@@ -54,14 +54,17 @@ export async function authenticate(
 ): Promise<void> {
   const token = extractToken(req);
   if (!token) {
+    console.log("[Auth] REJECT - no token - path:", req.path);
     return next(new UnauthorizedError("Missing authorization token"));
   }
 
   const user = await resolveUser(token);
   if (!user) {
+    console.log("[Auth] REJECT - invalid token - path:", req.path, "tokenLength:", token.length);
     return next(new UnauthorizedError("Invalid or expired token"));
   }
 
+  console.log("[Auth] OK - path:", req.path, "userId:", user.userId.substring(0, 8) + "...", "isGuest:", user.isGuest);
   req.userId = user.userId;
   req.authPayload = user;
   next();
@@ -74,13 +77,17 @@ export async function authenticateOptional(
 ): Promise<void> {
   const token = extractToken(req);
   if (!token) {
+    console.log("[AuthOptional] anonymous - path:", req.path);
     return next();
   }
 
   const user = await resolveUser(token);
   if (user) {
+    console.log("[AuthOptional] OK - path:", req.path, "userId:", user.userId.substring(0, 8) + "...", "isGuest:", user.isGuest);
     req.userId = user.userId;
     req.authPayload = user;
+  } else {
+    console.log("[AuthOptional] token invalid, proceeding anonymously - path:", req.path);
   }
   next();
 }

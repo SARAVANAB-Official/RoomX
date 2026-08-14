@@ -98,8 +98,10 @@ export function setupSocketHandlers(io: Server): void {
       displayName,
     });
 
+    const tokenPresent = !!(socket.handshake.auth as any)?.token;
+    const tokenValid = !!authPayload?.userId;
     console.log(
-      `Socket connected: ${socket.id} (user: ${userId || "guest"}, name: ${displayName})`
+      `Socket connected: ${socket.id} (user: ${userId || "guest"}, name: ${displayName}, tokenPresent: ${tokenPresent}, tokenValid: ${tokenValid})`
     );
 
     socket.on("room:join", async (payload, callback) => {
@@ -1150,7 +1152,7 @@ export function setupSocketHandlers(io: Server): void {
       }
     });
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", (reason) => {
       const data = connectedSockets.get(socket.id);
       if (data?.roomId) {
         io.to(data.roomId).emit("user:left", {
@@ -1161,7 +1163,7 @@ export function setupSocketHandlers(io: Server): void {
       }
 
       connectedSockets.delete(socket.id);
-      console.log(`Socket disconnected: ${socket.id}`);
+      console.log(`Socket disconnected: ${socket.id} (user: ${userId || "guest"}, room: ${data?.roomId || "none"}, reason: ${reason})`);
     });
   });
 }

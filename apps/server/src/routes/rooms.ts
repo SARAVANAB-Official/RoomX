@@ -30,7 +30,17 @@ const updateSettingsSchema = z.object({
 
 router.post("/api/rooms", authenticateOptional, async (req, res, next) => {
   try {
-    const body = createRoomSchema.parse(req.body);
+    let body;
+    try {
+      body = createRoomSchema.parse(req.body);
+    } catch (zodErr) {
+      console.error("[Room] validation failed:", (zodErr as Error).message);
+      return res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "Invalid request body" },
+      });
+    }
+
     const roomId = generateRoomId();
     const roomCode = generateRoomCode();
 
@@ -41,11 +51,19 @@ router.post("/api/rooms", authenticateOptional, async (req, res, next) => {
       const displayName = body.displayName || "Guest";
       userId = uuidv4();
 
-      await supabaseAdmin.from("users").upsert({
+      const { error: userErr } = await supabaseAdmin.from("users").upsert({
         id: userId,
         display_name: displayName,
         is_guest: true,
       }, { onConflict: "id" });
+
+      if (userErr) {
+        console.error("[Room] user upsert failed:", userErr.message, userErr.code, userErr.details);
+        return res.status(500).json({
+          success: false,
+          error: { code: "DB_ERROR", message: "Failed to create guest user" },
+        });
+      }
 
       guestToken = jwt.sign(
         { userId, displayName, isGuest: true },
@@ -53,11 +71,19 @@ router.post("/api/rooms", authenticateOptional, async (req, res, next) => {
         { expiresIn: "24h" }
       );
     } else {
-      await supabaseAdmin.from("users").upsert({
+      const { error: userErr } = await supabaseAdmin.from("users").upsert({
         id: userId,
         display_name: req.authPayload?.email || "User",
         is_guest: req.authPayload?.isGuest || false,
       }, { onConflict: "id" });
+
+      if (userErr) {
+        console.error("[Room] user upsert failed:", userErr.message, userErr.code, userErr.details);
+        return res.status(500).json({
+          success: false,
+          error: { code: "DB_ERROR", message: "Failed to create user" },
+        });
+      }
     }
 
     const { data, error } = await supabaseAdmin
@@ -73,13 +99,27 @@ router.post("/api/rooms", authenticateOptional, async (req, res, next) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("[Room] room insert failed:", error.message, error.code, error.details);
+      return res.status(500).json({
+        success: false,
+        error: { code: "DB_ERROR", message: "Failed to create room" },
+      });
+    }
 
-    await supabaseAdmin.from("room_members").insert({
+    const { error: memberErr } = await supabaseAdmin.from("room_members").insert({
       room_id: roomId,
       user_id: userId,
       role: "owner",
     });
+
+    if (memberErr) {
+      console.error("[Room] member insert failed:", memberErr.message, memberErr.code, memberErr.details);
+      return res.status(500).json({
+        success: false,
+        error: { code: "DB_ERROR", message: "Failed to add room member" },
+      });
+    }
 
     const responseData: Record<string, unknown> = {
       id: data.id,
@@ -100,6 +140,7 @@ router.post("/api/rooms", authenticateOptional, async (req, res, next) => {
 
     res.status(201).json(response);
   } catch (err) {
+    console.error("[Room] unexpected create error:", err);
     next(err);
   }
 });
@@ -195,7 +236,7 @@ router.get("/api/rooms/:roomId", authenticateOptional, async (req, res, next) =>
   }
 });
 
-router.post("/api/rooms/:roomId/join", authenticate, async (req, res, next) => {
+router.post("/api/rooms/:roomId/join", authenticateOptional, async (req, res, next) => {
   try {
     const { roomId } = req.params;
 
@@ -207,12 +248,37 @@ router.post("/api/rooms/:roomId/join", authenticate, async (req, res, next) => {
 
     if (roomError || !room) throw new NotFoundError("Room not found");
 
+    let userId = req.userId;
+    let guestToken: string | undefined;
+
+    if (!userId) {
+      const displayName = (req.body?.displayName as string) || "Guest";
+      userId = uuidv4();
+
+      const { error: userErr } = await supabaseAdmin.from("users").upsert({
+        id: userId,
+        display_name: displayName,
+        is_guest: true,
+      }, { onConflict: "id" });
+
+      if (userErr) {
+        console.error("[Room join] user upsert failed:", userErr.message, userErr.code);
+        throw userErr;
+      }
+
+      guestToken = jwt.sign(
+        { userId, displayName, isGuest: true },
+        config.jwtSecret,
+        { expiresIn: "24h" }
+      );
+    }
+
     if (room.is_locked) {
       const { data: existingMember } = await supabaseAdmin
         .from("room_members")
         .select("id")
         .eq("room_id", roomId)
-        .eq("user_id", req.userId)
+        .eq("user_id", userId)
         .single();
 
       if (!existingMember) {
@@ -233,22 +299,33 @@ router.post("/api/rooms/:roomId/join", authenticate, async (req, res, next) => {
       .from("room_members")
       .select("id")
       .eq("room_id", roomId)
-      .eq("user_id", req.userId)
+      .eq("user_id", userId)
       .single();
 
     if (existingMember) {
-      return res.json({ success: true, data: { message: "Already a member" } });
+      const responseData: Record<string, unknown> = { message: "Already a member" };
+      if (guestToken) {
+        responseData.userId = userId;
+        responseData.guestToken = guestToken;
+      }
+      return res.json({ success: true, data: responseData });
     }
 
     const { error } = await supabaseAdmin.from("room_members").insert({
       room_id: roomId,
-      user_id: req.userId,
+      user_id: userId,
       role: "member",
     });
 
     if (error) throw error;
 
-    res.status(201).json({ success: true, data: { message: "Joined room" } });
+    const responseData: Record<string, unknown> = { message: "Joined room" };
+    if (guestToken) {
+      responseData.userId = userId;
+      responseData.guestToken = guestToken;
+    }
+
+    res.status(201).json({ success: true, data: responseData });
   } catch (err) {
     next(err);
   }
