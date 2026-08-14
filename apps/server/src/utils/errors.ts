@@ -77,6 +77,18 @@ export function errorHandler(
     return;
   }
 
+  if (err.name === "SyntaxError" && "status" in err && (err as any).status === 400) {
+    console.error("Bad request (malformed JSON):", (err as any).body?.substring(0, 100));
+    res.status(400).json({
+      success: false,
+      error: {
+        code: "BAD_REQUEST",
+        message: "Invalid request body",
+      },
+    });
+    return;
+  }
+
   console.error("Unhandled error:", err.message, err.stack?.split("\n").slice(0, 3).join(" | "));
   res.status(500).json({
     success: false,
