@@ -36,7 +36,7 @@ export default function ChatPanel({ socket }: ChatPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const pinnedMessages = messages.filter(
-    (m) => !m.isDeleted && m.reactions.some((r) => r.emoji === '📌')
+    (m) => !m.isDeleted && (m.reactions ?? []).some((r) => r.emoji === '📌')
   );
 
   const filteredMessages = searchQuery

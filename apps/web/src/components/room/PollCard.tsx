@@ -12,13 +12,13 @@ export default function PollCard({ poll, onVote, onClose }: PollCardProps) {
   const user = useAuthStore((s) => s.user);
   const isClosed = poll.status === 'CLOSED';
   const hasVoted = poll.options.some((opt) =>
-    opt.votes.some((v) => v.userId === user?.id)
+    (opt.votes ?? []).some((v) => v.userId === user?.id)
   );
   const canVote = !isClosed && !hasVoted && user;
   const canClose = poll.createdBy === user?.id && !isClosed;
 
   const votedOptionId = poll.options.find((opt) =>
-    opt.votes.some((v) => v.userId === user?.id)
+    (opt.votes ?? []).some((v) => v.userId === user?.id)
   )?.id;
 
   return (
