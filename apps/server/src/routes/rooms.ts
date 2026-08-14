@@ -273,6 +273,17 @@ router.post("/api/rooms/:roomId/join", authenticateOptional, async (req, res, ne
       );
     }
 
+    const { data: ban } = await supabaseAdmin
+      .from("bans")
+      .select("id")
+      .eq("room_id", roomId)
+      .eq("user_id", userId)
+      .single();
+
+    if (ban) {
+      throw new ForbiddenError("You are banned from this room");
+    }
+
     if (room.is_locked) {
       const { data: existingMember } = await supabaseAdmin
         .from("room_members")
