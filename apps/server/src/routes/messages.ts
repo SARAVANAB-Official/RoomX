@@ -27,6 +27,22 @@ async function assertMember(roomId: string, userId: string): Promise<void> {
   if (!data) throw new ForbiddenError("Not a member of this room");
 }
 
+function mapDbMessage(msg: any): any {
+  return {
+    id: msg.id,
+    roomId: msg.room_id,
+    senderId: msg.user_id,
+    senderName: msg.display_name || msg.sender_name || 'Unknown',
+    content: msg.content,
+    timestamp: msg.created_at,
+    isEdited: msg.is_edited || false,
+    editedAt: msg.edited_at || undefined,
+    replyTo: msg.reply_to_id || undefined,
+    reactions: msg.reactions || [],
+    isDeleted: msg.is_deleted || false,
+  };
+}
+
 router.get("/api/rooms/:roomId/messages", authenticate, async (req, res, next) => {
   try {
     const { roomId } = req.params;
@@ -36,7 +52,7 @@ router.get("/api/rooms/:roomId/messages", authenticate, async (req, res, next) =
 
     let dbQuery = supabaseAdmin
       .from("messages")
-      .select("*")
+      .select("*, users!messages_user_id_fkey(display_name)")
       .eq("room_id", roomId)
       .order("created_at", { ascending: false })
       .range(query.offset, query.offset + query.limit - 1);
@@ -57,7 +73,12 @@ router.get("/api/rooms/:roomId/messages", authenticate, async (req, res, next) =
 
     if (error) throw error;
 
-    res.json({ success: true, data: data.reverse() });
+    const mapped = (data || []).reverse().map((msg: any) => ({
+      ...mapDbMessage(msg),
+      senderName: msg.users?.display_name || msg.sender_name || 'Unknown',
+    }));
+
+    res.json({ success: true, data: mapped });
   } catch (err) {
     next(err);
   }
@@ -86,7 +107,7 @@ router.post(
 
       if (error) throw error;
 
-      res.status(201).json({ success: true, data });
+      res.status(201).json({ success: true, data: mapDbMessage(data) });
     } catch (err) {
       next(err);
     }

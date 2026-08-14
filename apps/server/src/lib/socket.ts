@@ -28,6 +28,22 @@ const mediaStateSchema = z.object({
 });
 const chatMessageSchema = z.object({ content: z.string().min(1).max(5000) });
 const chatTypingSchema = z.object({ isTyping: z.boolean() });
+
+function mapDbMessage(msg: any, displayName?: string): any {
+  return {
+    id: msg.id,
+    roomId: msg.room_id,
+    senderId: msg.user_id,
+    senderName: displayName || msg.display_name || msg.sender_name || 'Unknown',
+    content: msg.content,
+    timestamp: msg.created_at,
+    isEdited: msg.is_edited || false,
+    editedAt: msg.edited_at || undefined,
+    replyTo: msg.reply_to_id || undefined,
+    reactions: msg.reactions || [],
+    isDeleted: msg.is_deleted || false,
+  };
+}
 const chatReactionSchema = z.object({
   messageId: z.string().uuid(),
   emoji: z.string().max(10),
@@ -526,14 +542,16 @@ export function setupSocketHandlers(io: Server): void {
             user_id: userId,
             content,
           })
-          .select()
+          .select("*, users!messages_user_id_fkey(display_name)")
           .single();
 
         if (error) throw error;
 
-        io.to(data.roomId).emit("chat:message", message);
+        const mapped = mapDbMessage(message);
+        mapped.senderName = message.users?.display_name || data.displayName || 'Unknown';
+        io.to(data.roomId).emit("chat:message", mapped);
 
-        callback?.({ success: true, data: message });
+        callback?.({ success: true, data: mapped });
       } catch (err) {
         const message =
           err instanceof z.ZodError

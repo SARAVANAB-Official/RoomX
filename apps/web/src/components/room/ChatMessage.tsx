@@ -76,7 +76,7 @@ export default function ChatMessage({
 
   const grouped = groupReactions(message.reactions ?? []);
 
-  const isSystemMessage = message.senderId === 'system' || message.content.startsWith('[system]');
+  const isSystemMessage = message.senderId === 'system' || (message.content ?? '').startsWith('[system]');
 
   if (isSystemMessage) {
     return (
@@ -106,7 +106,7 @@ export default function ChatMessage({
 
       <div className="flex gap-3">
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 text-xs font-bold text-white mt-0.5">
-          {message.senderName.charAt(0).toUpperCase()}
+          {message.senderName?.charAt(0)?.toUpperCase() || '?'}
         </div>
 
         <div className="flex-1 min-w-0">

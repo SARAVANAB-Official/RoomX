@@ -43,8 +43,8 @@ export default function ChatPanel({ socket }: ChatPanelProps) {
     ? messages.filter(
         (m) =>
           !m.isDeleted &&
-          (m.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            m.senderName.toLowerCase().includes(searchQuery.toLowerCase()))
+          (m.content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            m.senderName?.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     : messages.filter((m) => !m.isDeleted);
 
