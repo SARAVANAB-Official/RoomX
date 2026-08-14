@@ -20,7 +20,7 @@ export const useChatStore = create<ChatState>((set) => ({
 
   addMessage: (message) =>
     set((state) => ({
-      messages: [...state.messages, message],
+      messages: [...state.messages, { ...message, reactions: message.reactions ?? [] }],
       unreadCount: state.unreadCount + 1,
     })),
 

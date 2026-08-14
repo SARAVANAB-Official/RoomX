@@ -74,7 +74,7 @@ export default function ChatMessage({
   const isOwn = user?.id === message.senderId;
   const canDelete = isOwn || isModerator;
 
-  const grouped = groupReactions(message.reactions);
+  const grouped = groupReactions(message.reactions ?? []);
 
   const isSystemMessage = message.senderId === 'system' || message.content.startsWith('[system]');
 

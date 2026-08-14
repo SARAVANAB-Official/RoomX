@@ -45,7 +45,7 @@ export const usePollStore = create<PollState>((set) => ({
                   ...o,
                   voteCount: o.voteCount + 1,
                   votes: [
-                    ...o.votes,
+                    ...(o.votes ?? []),
                     {
                       id: `${Date.now()}-${userId}`,
                       pollId,
