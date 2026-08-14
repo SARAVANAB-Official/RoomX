@@ -36,6 +36,21 @@ async function assertMember(roomId: string, userId: string): Promise<void> {
   if (!data) throw new ForbiddenError("Not a member of this room");
 }
 
+function shapeFile(f: any) {
+  return {
+    id: f.id,
+    roomId: f.room_id,
+    userId: f.user_id,
+    name: f.filename,
+    originalName: f.original_name,
+    mimeType: f.mime_type,
+    size: f.file_size,
+    url: f.storage_path,
+    type: f.file_type,
+    createdAt: f.created_at,
+  };
+}
+
 router.get("/api/rooms/:roomId/files", authenticate, async (req, res, next) => {
   try {
     const { roomId } = req.params;
@@ -49,7 +64,7 @@ router.get("/api/rooms/:roomId/files", authenticate, async (req, res, next) => {
 
     if (error) throw error;
 
-    res.json({ success: true, data });
+    res.json({ success: true, data: (data || []).map(shapeFile) });
   } catch (err) {
     next(err);
   }
@@ -91,22 +106,33 @@ router.post(
 
       const safeName = sanitizeFilename(body.name);
 
+      function getFileType(mime: string): string {
+        if (mime.startsWith("image/")) return "image";
+        if (mime.startsWith("video/")) return "video";
+        if (mime.startsWith("audio/")) return "audio";
+        if (mime.includes("pdf") || mime.includes("document") || mime.includes("zip")) return "document";
+        if (mime.startsWith("text/")) return "text";
+        return "other";
+      }
+
       const { data, error } = await supabaseAdmin
         .from("files")
         .insert({
           room_id: roomId,
           user_id: req.userId,
-          name: safeName,
+          filename: safeName,
+          original_name: body.name,
           mime_type: body.mimeType,
-          size: body.size,
-          url: body.url,
+          file_size: body.size,
+          storage_path: body.url,
+          file_type: getFileType(body.mimeType),
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      res.status(201).json({ success: true, data });
+      res.status(201).json({ success: true, data: shapeFile(data) });
     } catch (err) {
       next(err);
     }

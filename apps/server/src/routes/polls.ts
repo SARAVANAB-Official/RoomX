@@ -9,12 +9,11 @@ const router = Router();
 const createPollSchema = z.object({
   question: z.string().min(1).max(500),
   options: z.array(z.string().min(1).max(200)).min(2).max(10),
-  allowMultiple: z.boolean().default(false),
-  expiresAt: z.string().datetime().optional(),
+  isAnonymous: z.boolean().default(false),
 });
 
 const voteSchema = z.object({
-  optionIndex: z.number().int().min(0),
+  optionId: z.string().uuid(),
 });
 
 async function assertMember(roomId: string, userId: string): Promise<void> {
@@ -34,22 +33,37 @@ router.post("/api/rooms/:roomId/polls", authenticate, async (req, res, next) => 
 
     const body = createPollSchema.parse(req.body);
 
-    const { data, error } = await supabaseAdmin
+    const { data: poll, error: pollError } = await supabaseAdmin
       .from("polls")
       .insert({
         room_id: roomId,
         user_id: req.userId,
         question: body.question,
-        options: body.options,
-        allow_multiple: body.allowMultiple,
-        expires_at: body.expiresAt || null,
+        is_anonymous: body.isAnonymous,
+        status: "active",
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (pollError) throw pollError;
 
-    res.status(201).json({ success: true, data });
+    const optionsToInsert = body.options.map((text, index) => ({
+      poll_id: poll.id,
+      text,
+      position: index,
+    }));
+
+    const { data: options, error: optionsError } = await supabaseAdmin
+      .from("poll_options")
+      .insert(optionsToInsert)
+      .select();
+
+    if (optionsError) throw optionsError;
+
+    res.status(201).json({
+      success: true,
+      data: { ...poll, options },
+    });
   } catch (err) {
     next(err);
   }
@@ -74,58 +88,48 @@ router.post(
 
       if (pollError || !poll) throw new NotFoundError("Poll not found");
 
-      if (poll.expires_at && new Date(poll.expires_at) < new Date()) {
-        throw new ForbiddenError("Poll has expired");
+      if (poll.status === "closed") {
+        throw new ForbiddenError("Poll is closed");
       }
 
-      if (body.optionIndex >= poll.options.length) {
-        throw new ForbiddenError("Invalid option index");
-      }
+      const { data: option, error: optionError } = await supabaseAdmin
+        .from("poll_options")
+        .select("id")
+        .eq("id", body.optionId)
+        .eq("poll_id", pollId)
+        .single();
 
-      if (!poll.allow_multiple) {
-        const { data: existingVote } = await supabaseAdmin
+      if (optionError || !option) throw new NotFoundError("Invalid option");
+
+      const { data: existingVote } = await supabaseAdmin
+        .from("poll_votes")
+        .select("id")
+        .eq("poll_id", pollId)
+        .eq("user_id", req.userId)
+        .single();
+
+      if (existingVote) {
+        const { error: deleteError } = await supabaseAdmin
           .from("poll_votes")
-          .select("id")
-          .eq("poll_id", pollId)
-          .eq("user_id", req.userId)
-          .single();
+          .delete()
+          .eq("id", existingVote.id);
 
-        if (existingVote) {
-          const { error: deleteError } = await supabaseAdmin
-            .from("poll_votes")
-            .delete()
-            .eq("poll_id", pollId)
-            .eq("user_id", req.userId);
-
-          if (deleteError) throw deleteError;
-        }
-      } else {
-        const { data: existingVote } = await supabaseAdmin
-          .from("poll_votes")
-          .select("id")
-          .eq("poll_id", pollId)
-          .eq("user_id", req.userId)
-          .eq("option_index", body.optionIndex)
-          .single();
-
-        if (existingVote) {
-          throw new ConflictError("Already voted for this option");
-        }
+        if (deleteError) throw deleteError;
       }
 
-      const { data, error } = await supabaseAdmin
+      const { data: vote, error: voteError } = await supabaseAdmin
         .from("poll_votes")
         .insert({
           poll_id: pollId,
+          option_id: body.optionId,
           user_id: req.userId,
-          option_index: body.optionIndex,
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (voteError) throw voteError;
 
-      res.status(201).json({ success: true, data });
+      res.status(201).json({ success: true, data: vote });
     } catch (err) {
       next(err);
     }
@@ -137,7 +141,7 @@ router.get("/api/rooms/:roomId/polls", authenticate, async (req, res, next) => {
     const { roomId } = req.params;
     await assertMember(roomId, req.userId!);
 
-    const { data, error } = await supabaseAdmin
+    const { data: polls, error } = await supabaseAdmin
       .from("polls")
       .select("*")
       .eq("room_id", roomId)
@@ -145,7 +149,48 @@ router.get("/api/rooms/:roomId/polls", authenticate, async (req, res, next) => {
 
     if (error) throw error;
 
-    res.json({ success: true, data });
+    const pollIds = (polls || []).map((p: any) => p.id);
+
+    let optionsMap: Record<string, any[]> = {};
+    let votesMap: Record<string, any[]> = {};
+
+    if (pollIds.length > 0) {
+      const { data: allOptions } = await supabaseAdmin
+        .from("poll_options")
+        .select("*")
+        .in("poll_id", pollIds)
+        .order("position");
+
+      if (allOptions) {
+        for (const opt of allOptions) {
+          if (!optionsMap[opt.poll_id]) optionsMap[opt.poll_id] = [];
+          optionsMap[opt.poll_id].push(opt);
+        }
+      }
+
+      const { data: allVotes } = await supabaseAdmin
+        .from("poll_votes")
+        .select("*")
+        .in("poll_id", pollIds);
+
+      if (allVotes) {
+        for (const vote of allVotes) {
+          if (!votesMap[vote.poll_id]) votesMap[vote.poll_id] = [];
+          votesMap[vote.poll_id].push(vote);
+        }
+      }
+    }
+
+    const enriched = (polls || []).map((poll: any) => ({
+      ...poll,
+      options: (optionsMap[poll.id] || []).map((opt: any) => ({
+        ...opt,
+        voteCount: (votesMap[poll.id] || []).filter((v: any) => v.option_id === opt.id).length,
+      })),
+      totalVotes: (votesMap[poll.id] || []).length,
+    }));
+
+    res.json({ success: true, data: enriched });
   } catch (err) {
     next(err);
   }

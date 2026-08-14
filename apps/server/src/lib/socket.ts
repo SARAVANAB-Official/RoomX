@@ -525,7 +525,6 @@ export function setupSocketHandlers(io: Server): void {
             room_id: data.roomId,
             user_id: userId,
             content,
-            type: "text",
           })
           .select()
           .single();

@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import { ZodError } from "zod";
 
 export class AppError extends Error {
   public readonly statusCode: number;
@@ -84,6 +85,19 @@ export function errorHandler(
       error: {
         code: "BAD_REQUEST",
         message: "Invalid request body",
+      },
+    });
+    return;
+  }
+
+  if (err instanceof ZodError) {
+    const details = err.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ");
+    console.error("Validation error:", details);
+    res.status(400).json({
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: details || "Invalid request body",
       },
     });
     return;

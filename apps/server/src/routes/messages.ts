@@ -15,7 +15,6 @@ const getMessagesSchema = z.object({
 
 const postMessageSchema = z.object({
   content: z.string().min(1).max(5000),
-  type: z.enum(["text", "system"]).default("text"),
 });
 
 async function assertMember(roomId: string, userId: string): Promise<void> {
@@ -81,7 +80,6 @@ router.post(
           room_id: roomId,
           user_id: req.userId,
           content: body.content,
-          type: body.type,
         })
         .select()
         .single();
