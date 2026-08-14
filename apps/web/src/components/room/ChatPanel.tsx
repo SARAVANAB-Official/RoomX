@@ -105,7 +105,7 @@ export default function ChatPanel({ socket }: ChatPanelProps) {
 
   const getMemberName = (userId: string): string => {
     const member = members.find((m) => m.userId === userId);
-    return member?.user.displayName || 'Unknown';
+    return member?.user?.displayName || 'Unknown';
   };
 
   const typingNames = typingUsers
